@@ -65,16 +65,8 @@
             </div>
         </div>
         <div id="cat-container">
-            <canvas id="cat-canvas"></canvas>
-            <video id="sbercat-video" playsinline muted
-                   style="position: absolute; width: 100%; height: 133%; object-fit: contain; display: none; z-index: 3;">
-                <source src="mp4/Scen_5_25fps.mp4" type="video/mp4">
-                Ваш браузер не поддерживает видео.
-            </video>
-            <video id="sbercat-video-2" playsinline muted
-                   style="position: absolute; width: 100%; height: 133%; object-fit: contain; display: none; z-index: 3"></video>
-            <video id="sbercat-video-3" playsinline muted style="display: none;"></video>
-        </div>
+                    <canvas id="cat-canvas"></canvas>
+                </div>
         <div class="third" style="height: 15vh"></div>
     </div>
 
@@ -159,34 +151,10 @@
     const SCENE_UUID = urlParams.uuid || '21e41c43-b5b1-490a-a27f-beb3331ee483';
     const STATION = urlParams.station ? parseInt(urlParams.station) : 5;
     const isAndroid = /Android/i.test(navigator.userAgent);
-    let catCanvas, webglProcessor, activeVideo;
-    let videos;
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    let catCanvas, webglProcessor;
     let totalBalls = 0;
     let isWrongStationHandled = false;
-
-    const skipVideoButton = document.getElementById('skipVideoButton');
-
-    function updateSkipButtonVisibility() {
-        if (activeVideo && !activeVideo.paused && !activeVideo.ended && activeVideo.currentSrc) {
-            skipVideoButton.style.display = 'block';
-        } else {
-            skipVideoButton.style.display = 'none';
-        }
-        const currentSrc = activeVideo.currentSrc || '';
-        const fileName = currentSrc.split('/').pop();
-        if (fileName.includes('waiting') || fileName.length === 0) {
-            skipVideoButton.style.display = 'none';
-        } else {
-            skipVideoButton.style.display = 'block';
-        }
-    }
-
-    skipVideoButton.addEventListener('click', () => {
-        if (activeVideo && !activeVideo.paused && !activeVideo.ended) {
-            skipVideoButton.style.display = 'none';
-            activeVideo.currentTime = activeVideo.duration;
-        }
-    });
 
     async function createStatistics(sceneUuid, station = null, points = null) {
         const userUuid = localStorage.getItem('user_id');
@@ -237,74 +205,7 @@
         }
     }
 
-    function getPlatformVideoSrc(src) {
-        if (isAndroid) {
-            return src.replace(/\.mp4$/, '.webm');
-        }
-        return src;
-    }
-
-    function playVideo(src, loop = false) {
-        const nextVideo = videos.find(v => v !== activeVideo);
-        if (!nextVideo) return;
-        nextVideo.src = getPlatformVideoSrc(src);
-        activeVideo = nextVideo;
-        videos.forEach(v => v.style.display = 'none');
-
-        const videoSource = nextVideo.currentSrc || nextVideo.src || "";
-        if (videoSource.includes('Scen_5_25fps')) {
-            if (activeVideo) {
-                activeVideo.pause();
-                activeVideo.currentTime = 0;
-                activeVideo.style.display = 'none';
-            }
-            if (catCanvas) {
-                catCanvas.style.display = 'none';
-            }
-            document.getElementById("final-ui2").style.display = "block";
-            document.getElementById("final-message-after-video").style.display = "block";
-            document.getElementById("final-points").style.height="auto";
-            document.getElementById("final-points").style.padding="10px";
-            document.getElementById("question-container").style.height="auto";
-        } else if (videoSource.includes('cat_2_scene_wrong_station_25Fps')) {
-            document.getElementById("wrong-btn").style.display = "block";
-        }
-    }
-
-    function applyAndroidVideoTransform(videoElement) {
-        if (!videoElement.videoWidth || !videoElement.videoHeight) return;
-        const container = document.getElementById('cat-container');
-        const contW = container.offsetWidth;
-        const contH = container.offsetHeight;
-        const vW = videoElement.videoWidth;
-        const vH = videoElement.videoHeight;
-        const cropPercent = 0;
-        const croppedHeight = vH * (1 - cropPercent);
-        const scale = Math.min(contW / vW, contH / croppedHeight);
-        const finalW = vW * scale;
-        const finalH = vH * scale;
-        const offsetX = (contW - finalW) / 2;
-        const offsetY = (contH - finalH) / 2 - (vH * cropPercent * scale);
-        videoElement.style.position = 'absolute';
-        videoElement.style.left = offsetX + 'px';
-        videoElement.style.top = offsetY + 'px';
-        videoElement.style.width = finalW + 'px';
-        videoElement.style.height = finalH + 'px';
-        videoElement.style.objectFit = 'cover';
-    }
-
-    function applyChromaKey(videoElement) {
-        // Video is disabled.
-    }
-
-    function renderLoop() {
-        requestAnimationFrame(renderLoop);
-        if (activeVideo && !activeVideo.paused) {
-            if (!isAndroid) {
-                applyChromaKey(activeVideo);
-            }
-        }
-    }
+    
 
     function handleWrongStation() {
         if (isWrongStationHandled) return;
@@ -349,56 +250,9 @@
         startWebcam();
         catCanvas = document.getElementById('cat-canvas');
 
-        if (isAndroid) {
+        if (isAndroid || isIOS) {
             catCanvas.style.display = 'none';
-        } else {
-            webglProcessor = new WebGLVideoProcessor(catCanvas);
         }
-
-        videos = [
-            document.getElementById('sbercat-video'),
-            document.getElementById('sbercat-video-2'),
-            document.getElementById('sbercat-video-3')
-        ];
-        activeVideo = videos[0];
-
-
-
-        videos.forEach(v => {
-            v.addEventListener('ended', function () {
-                const videoSource = v.currentSrc || v.src || "";
-                skipVideoButton.style.display = 'none';
-                if (videoSource.includes('Scen_5_25fps')) {
-                    if (activeVideo) {
-                        activeVideo.pause();
-                        activeVideo.currentTime = 0;
-                        activeVideo.style.display = 'none';
-                    }
-                    if (catCanvas) {
-                        catCanvas.style.display = 'none';
-                    }
-                    document.getElementById("final-ui2").style.display = "block";
-                    document.getElementById("final-message-after-video").style.display = "block";
-                    document.getElementById("final-points").style.height="auto";
-                    document.getElementById("final-points").style.padding="10px";
-                    document.getElementById("question-container").style.height="auto";
-                    return;
-                }
-                if (videoSource.includes('cat_2_scene_wrong_station_25Fps')) {
-                    document.getElementById("wrong-btn").style.display = "block";
-                }
-                if (!v.loop) {
-                    playVideo('mp4/waiting_coffe_25Fps.mp4', true);
-                }
-                updateSkipButtonVisibility();
-            });
-        });
-
-        window.addEventListener('resize', () => {
-            if (!isAndroid && activeVideo) {
-                applyChromaKey(activeVideo);
-            }
-        });
 
         const currentFile = window.location.pathname.split('/').pop();
         let expectedStation = localStorage.getItem('currentStation');
@@ -417,7 +271,6 @@
     }
     const soundStartBtn = document.getElementById('soundStartBtn');
     soundStartBtn.addEventListener('click', () => {
-        videos.forEach(v => v.muted = false);
         soundOverlay.style.display = 'none';
         totalBalls = localStorage.getItem('total_balls') || 0;
         finishQuiz();
@@ -426,7 +279,17 @@
         createStatistics(SCENE_UUID, STATION);
         const finalUI = document.getElementById("final-ui");
         finalUI.style.display = "block";
-        playVideo('mp4/Scen_5_25fps.mp4', false);
+        
+        // Directly show the final UI elements
+        if (catCanvas) {
+            catCanvas.style.display = 'none';
+        }
+        document.getElementById("final-ui2").style.display = "block";
+        document.getElementById("final-message-after-video").style.display = "block";
+        document.getElementById("final-points").style.height="auto";
+        document.getElementById("final-points").style.padding="10px";
+        document.getElementById("question-container").style.height="auto";
+
         function getCoinDeclension(number) {
             number = Math.abs(number);
             if (number % 10 === 1 && number % 100 !== 11) return 'монета';
@@ -439,7 +302,7 @@
             <div style="font-size: 50px">Ура!</div>
             <div>Ты прошёл квест и ответил на все вопросы!</div>
             <div style="margin-top: 10px">Твой результат: ${totalBalls} ${coinString}!</div>
-            <div id="final-message-after-video" style="display:none" >
+            <div id="final-message-after-video" >
         <div>Скорее обратись к сотруднику Сбера на последней станции, получи свой диплом и приятный сюрприз!</div>
         <div>Приходи еще, котан!</div>
     </div>
@@ -465,9 +328,6 @@
         };
     }
     init();
-    if (!isAndroid) {
-        renderLoop();
-    }
 </script>
 <div id="camera-access-required"
      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: black; color: white; text-align: center; z-index: 99999999;">

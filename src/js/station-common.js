@@ -61,14 +61,16 @@ function setupInitialNextButton(videoElement, buttonElement, timeout = 0) {
         if (buttonElement) {
             buttonElement.style.display = 'block';
         }
-        videoElement.removeEventListener('ended', showButtonAction);
-        videoElement.removeEventListener('stalled', showButtonAction);
-        videoElement.removeEventListener('error', showButtonAction);
+        if (videoElement) {
+            videoElement.removeEventListener('ended', showButtonAction);
+            videoElement.removeEventListener('stalled', showButtonAction);
+            videoElement.removeEventListener('error', showButtonAction);
+        }
         window.removeEventListener('offline', showButtonAction);
     };
 
-    if (!navigator.onLine) {
-        showButtonAction(); // Show immediately if offline
+    if (!navigator.onLine || !videoElement) {
+        showButtonAction(); // Show immediately if offline or no video element
     } else {
         videoElement.addEventListener('ended', showButtonAction, { once: true });
         videoElement.addEventListener('stalled', showButtonAction, { once: true });
@@ -146,6 +148,7 @@ function initializeApp(stationConfig, stationNumber) {
     const SCENE_UUID = urlParams.uuid || 'faf5826f-6089-42a9-a72c-9e19c95aca05';
     const STATION = stationNumber;
     const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     let activeVideo;
     let currentQuestionAudio = null;
     let onLastQuestion = false;
@@ -555,7 +558,7 @@ function initializeApp(stationConfig, stationNumber) {
     startBtn.style.display = "none";
     document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-    if (isAndroid) {
+    if (isAndroid || isIOS) {
         canvas.style.display = 'none';
     } else {
         webglProcessor = new WebGLVideoProcessor(canvas);
