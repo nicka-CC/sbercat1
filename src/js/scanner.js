@@ -168,12 +168,16 @@ function drawCat() {
 
 function getPlatformVideoSrc(src) {
     if (isAndroid) {
-        return src.replace(/\.mp4$/, '.webm');
+        let newSrc = src.replace(/\.mp4$/, '.webm');
+        if (isBudgetAndroid) {
+            newSrc = newSrc.replace('mp4/', '3/');
+        }
+        return newSrc;
     }
     return src;
 }
 function initCatVideo() {
-    const initialSrc = getPlatformVideoSrc('mp4/waiting_coffe_25Fps.mp4');
+    const initialSrc = getPlatformVideoSrc('https://nicka-cc.github.io/sbercat2/mp4/waiting_coffe_25Fps.mp4');
 
     catVideo.src = initialSrc;
     catVideo.load();

@@ -115,8 +115,8 @@ function initializeApp(stationConfig, stationNumber) {
 
     function updateSkipButtonVisibility() {
         let shouldShow = false;
-        if (activeVideo && !activeVideo.paused && !activeVideo.ended && activeVideo.currentSrc) {
-            const currentSrc = activeVideo.currentSrc;
+        if (activeVideo && !activeVideo.paused && !activeVideo.ended && (activeVideo.dataset.originalSrc || activeVideo.currentSrc)) {
+            const currentSrc = activeVideo.dataset.originalSrc || activeVideo.currentSrc;
             const fileName = currentSrc.split('/').pop();
 
             const isSpecialVideoByFullPath = currentSrc.includes(waitingVideo) ||
@@ -145,11 +145,10 @@ function initializeApp(stationConfig, stationNumber) {
     const urlParams = getUrlParams();
     const SCENE_UUID = urlParams.uuid || 'faf5826f-6089-42a9-a72c-9e19c95aca05';
     const STATION = stationNumber;
-    const isAndroid = /Android/i.test(navigator.userAgent);
+
     let activeVideo;
     let currentQuestionAudio = null;
     let onLastQuestion = false;
-    let currentWebcamStream = null;
     let shouldShowNextButtonAfterNewStationVideo = false;
 
     const startBtn = document.getElementById("startBtn");
@@ -261,31 +260,53 @@ function initializeApp(stationConfig, stationNumber) {
         }
     }
 
-    function getPlatformVideoSrc(src) {
-        third.style.display = 'block';
-        if (isAndroid) {
-            videoContainer.style.marginBottom = "2vh";
-            third.style.height = '12vh';
-            return src.replace(/\.mp4$/, '.webm');
-        }
-        return src;
-    }
+
 
     function playVideo(src, loop = false, forceSound = false, onPlayCallback = null) {
-    if (!src) {
-        console.error("playVideo called with invalid src");
-        return null;
+        if (!src) {
+            console.error("playVideo called with invalid src");
+            return null;
+        }
+        let nextVideo = (activeVideo === video1) ? video2 : video1;
+
+        const platformSrc = getPlatformVideoSrc(src);
+        const videoSrc = (window.preloadedVideoBlobs && window.preloadedVideoBlobs[platformSrc]) || platformSrc;
+
+        nextVideo.dataset.originalSrc = platformSrc; // Store the original source
+
+        nextVideo.loop = loop;
+        nextVideo.preload = "auto";
+        if (forceSound) nextVideo.muted = false;
+
+        // Always set the src to handle blob url changes
+        nextVideo.src = videoSrc;
+
+        nextVideo.load();
+
+        nextVideo.addEventListener('canplay', () => {
+            nextVideo.play().catch(e => console.error("Video play failed:", e));
+        }, { once: true });
+
+        nextVideo.addEventListener('playing', () => {
+            if (activeVideo) {
+                activeVideo.pause();
+                activeVideo.style.display = 'none';
+            }
+            nextVideo.style.display = 'block';
+            activeVideo = nextVideo;
+
+            if (!isAndroid) {
+                canvas.style.display = 'block';
+                video1.style.display = 'none';
+                video2.style.display = 'none';
+            }
+
+            if (onPlayCallback) onPlayCallback(nextVideo);
+            updateSkipButtonVisibility();
+        }, { once: true });
+
+        return nextVideo;
     }
-    let nextVideo = (activeVideo === video1) ? video2 : video1;
-    const videoSrc = getPlatformVideoSrc(src);
-    nextVideo.src = videoSrc;
-    activeVideo = nextVideo;
-    video1.style.display = 'none';
-    video2.style.display = 'none';
-    if (onPlayCallback) onPlayCallback(nextVideo);
-    updateSkipButtonVisibility();
-    return nextVideo;
-}
     function saveQuizState(stationNumber, state) {
         try {
             const key = `station_quiz_state_${stationNumber}`;
@@ -410,7 +431,7 @@ function initializeApp(stationConfig, stationNumber) {
                     return nextBtn;
                 };
                 // Call setupVideoButton immediately after initiating playVideo
-                const showNextButtonHandler = setupVideoButton(videoToPrepareButtonFor, createNextButton, controls, 4000, true);
+                const showNextButtonHandler = setupVideoButton(videoToPrepareButtonFor, createNextButton, controls, 4000, !navigator.onLine);
                 window.addEventListener('offline', showNextButtonHandler, { once: true });
             }
         } else {
@@ -428,7 +449,7 @@ function initializeApp(stationConfig, stationNumber) {
                     return retryBtn;
                 };
                 // Call setupVideoButton immediately after initiating playVideo
-                const showRetryButtonHandler = setupVideoButton(videoToPrepareButtonFor, createRetryButton, controls, undefined, true);
+                const showRetryButtonHandler = setupVideoButton(videoToPrepareButtonFor, createRetryButton, controls, undefined, !navigator.onLine);
                 window.addEventListener('offline', showRetryButtonHandler, { once: true });
             }
         }
@@ -440,7 +461,13 @@ function initializeApp(stationConfig, stationNumber) {
         onLastQuestion = false;
         playVideo(waitingVideo, true);
 
-        topAsk.innerHTML = `<div><div style="text-align: center; padding-bottom: 5px;font-size: 44px;">Отличная работа!</div><div>Ты прошёл станцию. Твои баллы: ${Number(sessionBalls + totalBalls)}</div></div>`;
+        topAsk.innerHTML = `<div>
+  <div style="text-align: center; padding-bottom: 5px;font-size: 44px;">
+    Отличная работа!
+  </div>
+  <div>Ты прошёл станцию. Твои баллы: ${Number(sessionBalls + totalBalls)}</div>
+  ${stationNumber === 4 ? '<div>Вперед на поиски финальной станции!</div>' : ''}
+</div>`;
         desc.textContent = '';
         ui.style.background = 'rgba(153,255,221,0)';
         ui.style.padding = '0';
@@ -465,7 +492,7 @@ function initializeApp(stationConfig, stationNumber) {
 
     function setupQuiz(stationConfig, stationNumber, introVideoElement) {
         skipVideoButton.style.display = 'block';
-        topAsk.innerHTML = `<div><div style="text-align: center; padding-bottom: 5px; font-size: 44px;">Привет, следопыт!</div><div style="align-items: center; display: flex">Смотри-ка, ты отлично справился — нашёл мои следы-подсказки!<br>Готов начать викторину?</p></div></div>`;
+        topAsk.innerHTML = `<div><div style="text-align: center; padding-bottom: 5px; font-size: 44px;">Привет, следопыт!</div><div style="align-items: center; display: flex">Смотри-ка, ты отлично справился — нашёл мои следы-подсказки!<br>${stationNumber === 2 ?'Готов начать викторину?' :'Готов продолжить викторину?'}</p></div></div>`;
         desc.textContent = '';
         ui.style.background = 'rgba(153,255,221,0)';
         ui.style.padding = '0';
@@ -510,31 +537,12 @@ function initializeApp(stationConfig, stationNumber) {
         });
     }
 
-    async function startWebcam() {
-        console.log('cam')
-        const videoElement = document.getElementById('webcam-feed');
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { ideal: "environment" },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    frameRate: { ideal: 24, max: 24 }
-                },
-                audio: false
-            });
-            videoElement.srcObject = stream;
-            currentWebcamStream = stream;
-        } catch (err) {
-            console.error("Error accessing webcam: ", err);
-            // document.getElementById('camera-access-required').style.display = 'block';
-        }
-    }
+
 
     function stopWebcam() {
-        if (currentWebcamStream) {
-            currentWebcamStream.getTracks().forEach(track => track.stop());
-            currentWebcamStream = null;
+        if (window.currentWebcamStream) {
+            window.currentWebcamStream.getTracks().forEach(track => track.stop());
+            window.currentWebcamStream = null;
         }
     }
 
@@ -542,7 +550,22 @@ function initializeApp(stationConfig, stationNumber) {
     let webglProcessor;
 
     function applyChromaKey(videoElement) {
-        // Video is disabled.
+        if (isAndroid || !webglProcessor || !videoElement.videoWidth) return;
+
+        const cropPercent = 0;
+        const crop = {
+            x: 0,
+            y: cropPercent,
+            width: 1,
+            height: 1 - cropPercent
+        };
+
+        const keyingOptions = {
+            threshold: (stationNumber === 2 ? 22 : 29) / 255.0,
+            max_green: 180.0 / 255.0
+        };
+
+        webglProcessor.render(videoElement, crop, keyingOptions);
     }
 
     function renderLoop() {
@@ -566,15 +589,22 @@ function initializeApp(stationConfig, stationNumber) {
     activeVideo = video1;
 
     function videoEndedCallback(videoElement) {
-        const videoSource = decodeURIComponent(videoElement.currentSrc || "");
+        const videoSource = decodeURIComponent(videoElement.dataset.originalSrc || videoElement.currentSrc || "");
+        
         if (videoSource.includes(introVideo.replace(".mp4", ""))) {
             // startBtn.style.display = "block"; // Removed, now handled by setupInitialNextButton
         }
-        if (videoSource.includes(wrongStationVideo.replace(".mp4", ""))) {
+        if (videoSource.includes('cat_2_scene_wrong_station_25Fps')) {
             const wrongBtn = document.getElementById("wrongStationBtn");
             if (wrongBtn) wrongBtn.style.display = "block";
         }
-        if (onLastQuestion && newStationVideo && videoSource.includes(correctAnswerVideo.replace(".mp4", ""))) {
+        
+        // --- Start of Robust Check Fix ---
+        const correctAnswerFileName = correctAnswerVideo.split('/').pop().replace('.mp4', '');
+        const videoSourceFileName = videoSource.split('/').pop().split('.')[0];
+        
+        if (onLastQuestion && newStationVideo && videoSourceFileName.includes(correctAnswerFileName)) {
+        // --- End of Robust Check Fix ---
             onLastQuestion = false;
             shouldShowNextButtonAfterNewStationVideo = true;
             playVideo(newStationVideo, false, true);
@@ -662,7 +692,8 @@ function initializeApp(stationConfig, stationNumber) {
                 if (activeVideo.ended || isVideoNearEnd) {
                     videoEndedCallback(activeVideo);
 
-                    if (shouldShowNextButtonAfterNewStationVideo && activeVideo.currentSrc.includes(newStationVideo.replace(".mp4", ""))) {
+                    const videoSource = activeVideo.dataset.originalSrc || activeVideo.currentSrc || "";
+                    if (shouldShowNextButtonAfterNewStationVideo && videoSource.includes(newStationVideo.replace(".mp4", ""))) {
                         if (!document.querySelector('#controls .primary')) {
                             shouldShowNextButtonAfterNewStationVideo = false;
                             const nextBtn = document.createElement('button');

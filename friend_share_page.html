@@ -31,7 +31,6 @@
             left: 50%;
             transform: translate(-50%, -52%);
             width: 100%;
-            height: 133%;
             object-fit: contain;
             display: none;
             z-index: 3;
@@ -40,9 +39,10 @@
 </head>
 <body>
 <script src="src/js/config.js"></script>
+<script src="src/js/common-functions.js"></script>
 <div id="soundOverlay">
     <div class="soundBox">
-<!--        <div style="color:white; font-size: 60px; margin-bottom: 30px">Готов посмотреть результат?</div>-->
+        <!--        <div style="color:white; font-size: 60px; margin-bottom: 30px">Готов посмотреть результат?</div>-->
         <button id="soundStartBtn">Смотреть!</button>
     </div>
 </div>
@@ -58,7 +58,7 @@
         </div>
         <div id="question-container">
             <div id="final-points" style="
-                font-size:40px;
+
                 font-weight:700;
                 height: 13.5vh;
                 overflow: hidden;
@@ -72,13 +72,13 @@
         </div>
         <div id="cat-container">
             <canvas id="cat-canvas"></canvas>
-            <video id="sbercat-video" playsinline muted style="display: none;">
+            <video id="sbercat-video-1" playsinline muted crossorigin="anonymous" style="display: none;">
                 Ваш браузер не поддерживает видео.
             </video>
-            <video id="sbercat-video-2" playsinline muted style="display: none;"></video>
-            <video id="sbercat-video-3" playsinline muted style="display: none;"></video>
+            <video id="sbercat-video-2" playsinline muted crossorigin="anonymous" style="display: none;"></video>
+            <video id="sbercat-video-3" playsinline muted crossorigin="anonymous" style="display: none;"></video>
         </div>
-        <div class="third" style="height: 15vh"></div>
+        <div class="third" id="third" style="height: 15vh"></div>
     </div>
 
     <div id="final-ui" style="display: none;"></div>
@@ -151,7 +151,20 @@
             overlay.style.display = 'none';
         }
     }
+    function fitTextToContainer(container, baseFontSize = 30, minFontSize = 5) {
+        const innerDiv = container.firstElementChild;
+        if (!innerDiv) return;
 
+        let fontSize = baseFontSize;
+        innerDiv.style.fontSize = fontSize + 'px';
+
+        const maxHeight = container.clientHeight;
+
+        while (innerDiv.scrollHeight > maxHeight && fontSize > minFontSize) {
+            fontSize -= 5;
+            innerDiv.style.fontSize = fontSize + 'px';
+        }
+    }
     // Initial check on page load
     document.addEventListener('DOMContentLoaded', checkOrientation);
     // Re-check on window resize and orientation change events
@@ -160,7 +173,6 @@
     const urlParams = getUrlParams();
     const SCENE_UUID = urlParams.uuid || '21e41c43-b5b1-490a-a27f-beb3331ee483';
     const STATION = urlParams.station ? parseInt(urlParams.station) : 5;
-    const isAndroid = /Android/i.test(navigator.userAgent);
     let catCanvas, catCtx, activeVideo;
     let videos;
     let totalBalls = 0;
@@ -183,12 +195,7 @@
         }
     }
 
-    function getPlatformVideoSrc(src) {
-        if (isAndroid) {
-            return src.replace(/\.mp4$/, '.webm');
-        }
-        return src;
-    }
+
 
     function playVideo(src, loop = false) {
         const nextVideo = videos.find(v => v !== activeVideo);
@@ -234,7 +241,7 @@
         catCanvas.height = catContainer.offsetHeight;
         catCtx.clearRect(0, 0, catCanvas.width, catCanvas.height);
 
-        const cropPercent = 0.13;
+        const cropPercent = 0;
         const sx = 0;
         const sy = videoElement.videoHeight * cropPercent;
         const sWidth = videoElement.videoWidth;
@@ -300,7 +307,7 @@
         }
 
         videos = [
-            document.getElementById('sbercat-video'),
+            document.getElementById('sbercat-video-1'),
             document.getElementById('sbercat-video-2'),
             document.getElementById('sbercat-video-3')
         ];
@@ -310,7 +317,7 @@
         videos.forEach(v => {
             v.addEventListener('ended', function () {
                 if (!v.loop) {
-                    playVideo('mp4/waiting_coffe_25Fps.mp4', true);
+                    playVideo('https://nicka-cc.github.io/sbercat2/mp4/waiting_coffe_25Fps.mp4', true);
                 }
             });
         });
@@ -325,14 +332,10 @@
     function finishQuiz() {
         const finalUI = document.getElementById("final-ui");
         finalUI.style.display = "block";
-        playVideo('mp4/waiting_coffe_25Fps.mp4', false);
+        playVideo('https://nicka-cc.github.io/sbercat2/mp4/waiting_coffe_25Fps.mp4', false);
 
-        document.getElementById("final-points").innerHTML = `
-          <div>
-            <div >Приходи в офис Сбера по адресу: Псков, Октябрьский пр., 23/25, пройди игру и получи диплом и приятный сюрприз.</div>
-            <div>До встречи, котан!</div>
-          </div>
-        `;
+        document.getElementById("final-points").innerHTML = `<div><div style="text-align: center; padding-bottom: 5px; ">Приходи в офис Сбера по адресу: Псков, Октябрьский пр., 23/25, пройди игру и получи диплом и приятный сюрприз.</div><div>До встречи, котан!</div></div>`;
+        fitTextToContainer(document.getElementById("final-points"), 44, 10);
     }
     init();
     renderLoop();

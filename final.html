@@ -5,6 +5,7 @@
     <title>Финал</title>
     <link href="https://fonts.sberbank.ru/css?family=SB+Sans:300,400,500,600,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./src/css/style.css">
+    <link rel="stylesheet" href="./src/css/preloader.css">
     <style>
         html, body {
             width: 100vw;
@@ -28,16 +29,22 @@
     </style>
 </head>
 <body>
+<div id="preloader">
+    <div id="preloader-text">Загрузка...</div>
+    <div id="preloader-progress-container">
+        <div id="preloader-progress-bar"></div>
+    </div>
+</div>
 <script src="src/js/webgl-video-processor.js"></script>
 <script src="src/js/config.js"></script>
-<div id="soundOverlay">
+<div id="soundOverlay" class="hidden">
     <div class="soundBox">
         <div style="color:white; font-size: 60px; margin-bottom: 30px">Готов посмотреть результат?</div>
         <button id="soundStartBtn">Смотреть!</button>
     </div>
 </div>
 
-<div id="main-content">
+<div id="main-content" class="hidden">
     <video id="arjs-video" playsinline autoplay muted></video>
 
     <div id="main-container">
@@ -66,16 +73,16 @@
         </div>
         <div id="cat-container">
             <canvas id="cat-canvas"></canvas>
-            <video id="sbercat-video" playsinline muted
-                   style="position: absolute; width: 100%; height: 133%; object-fit: contain; display: none; z-index: 3;">
-                <source src="mp4/Scen_5_25fps.mp4" type="video/mp4">
+            <video id="sbercat-video" playsinline muted crossorigin="anonymous"
+                   style="position: absolute; width: 100%; object-fit: contain; display: none; z-index: 3;">
+                <source src="https://nicka-cc.github.io/sbercat2/mp4/Scen_5_25fps.mp4" type="video/mp4">
                 Ваш браузер не поддерживает видео.
             </video>
-            <video id="sbercat-video-2" playsinline muted
-                   style="position: absolute; width: 100%; height: 133%; object-fit: contain; display: none; z-index: 3"></video>
-            <video id="sbercat-video-3" playsinline muted style="display: none;"></video>
+            <video id="sbercat-video-2" playsinline muted crossorigin="anonymous"
+                   style="position: absolute; width: 100%; object-fit: contain; display: none; z-index: 3"></video>
+            <video id="sbercat-video-3" playsinline muted crossorigin="anonymous" style="display: none;"></video>
         </div>
-        <div class="third" style="height: 15vh"></div>
+        <div class="third" id="third" style="height: 15vh"></div>
     </div>
 
     <div id="final-ui" style="display: none;"></div>
@@ -136,6 +143,8 @@
 <div id="orientation-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: black; color: white; display: flex; align-items: center; justify-content: center; z-index: 999999999;">
     <p style="font-size: 5vw; text-align: center;">Пожалуйста, поверните экран</p>
 </div>
+<script src="src/js/preloader.js"></script>
+<script src="src/js/common-functions.js"></script>
 <script>
 
     function checkOrientation() {
@@ -158,7 +167,6 @@
     const urlParams = getUrlParams();
     const SCENE_UUID = urlParams.uuid || '21e41c43-b5b1-490a-a27f-beb3331ee483';
     const STATION = urlParams.station ? parseInt(urlParams.station) : 5;
-    const isAndroid = /Android/i.test(navigator.userAgent);
     let catCanvas, webglProcessor, activeVideo;
     let videos;
     let totalBalls = 0;
@@ -167,17 +175,13 @@
     const skipVideoButton = document.getElementById('skipVideoButton');
 
     function updateSkipButtonVisibility() {
-        if (activeVideo && !activeVideo.paused && !activeVideo.ended && activeVideo.currentSrc) {
-            skipVideoButton.style.display = 'block';
-        } else {
-            skipVideoButton.style.display = 'none';
-        }
-        const currentSrc = activeVideo.currentSrc || '';
+        const currentSrc = (activeVideo && activeVideo.dataset.originalSrc) || (activeVideo && activeVideo.currentSrc) || '';
         const fileName = currentSrc.split('/').pop();
-        if (fileName.includes('waiting') || fileName.length === 0) {
-            skipVideoButton.style.display = 'none';
-        } else {
+
+        if (activeVideo && !activeVideo.paused && !activeVideo.ended && !fileName.includes('waiting') && fileName.length > 0) {
             skipVideoButton.style.display = 'block';
+        } else {
+            skipVideoButton.style.display = 'none';
         }
     }
 
@@ -237,37 +241,44 @@
         }
     }
 
-    function getPlatformVideoSrc(src) {
-        if (isAndroid) {
-            return src.replace(/\.mp4$/, '.webm');
-        }
-        return src;
-    }
+
 
     function playVideo(src, loop = false) {
         const nextVideo = videos.find(v => v !== activeVideo);
         if (!nextVideo) return;
-        nextVideo.src = getPlatformVideoSrc(src);
-        activeVideo = nextVideo;
-        videos.forEach(v => v.style.display = 'none');
 
-        const videoSource = nextVideo.currentSrc || nextVideo.src || "";
-        if (videoSource.includes('Scen_5_25fps')) {
-            if (activeVideo) {
-                activeVideo.pause();
-                activeVideo.currentTime = 0;
-                activeVideo.style.display = 'none';
-            }
-            if (catCanvas) {
-                catCanvas.style.display = 'none';
-            }
-            document.getElementById("final-ui2").style.display = "block";
-            document.getElementById("final-message-after-video").style.display = "block";
-            document.getElementById("final-points").style.height="auto";
-            document.getElementById("final-points").style.padding="10px";
-            document.getElementById("question-container").style.height="auto";
-        } else if (videoSource.includes('cat_2_scene_wrong_station_25Fps')) {
-            document.getElementById("wrong-btn").style.display = "block";
+        const platformSrc = getPlatformVideoSrc(src);
+        const videoSrc = (window.preloadedVideoBlobs && window.preloadedVideoBlobs[platformSrc]) || platformSrc;
+        nextVideo.dataset.originalSrc = platformSrc;
+
+        nextVideo.pause();
+        nextVideo.currentTime = 0;
+        nextVideo.src = videoSrc;
+        nextVideo.loop = loop;
+        nextVideo.muted = false;
+        nextVideo.load();
+
+        const playPromise = nextVideo.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                if (activeVideo) {
+                    activeVideo.pause();
+                    if (isAndroid) {
+                        document.getElementById("sbercat-video-2").style.display = 'none';
+                    }
+                }
+                activeVideo = nextVideo;
+                if (isAndroid) {
+                    activeVideo.style.display = 'block';
+                    catCanvas.style.display = 'none';
+                } else {
+                    activeVideo.style.display = 'none';
+                    catCanvas.style.display = 'block';
+                }
+                updateSkipButtonVisibility();
+            }).catch(error => {
+                console.error("Video play failed:", error);
+            });
         }
     }
 
@@ -278,7 +289,7 @@
         const contH = container.offsetHeight;
         const vW = videoElement.videoWidth;
         const vH = videoElement.videoHeight;
-        const cropPercent = 0;
+        const cropPercent = 0.5;
         const croppedHeight = vH * (1 - cropPercent);
         const scale = Math.min(contW / vW, contH / croppedHeight);
         const finalW = vW * scale;
@@ -294,7 +305,22 @@
     }
 
     function applyChromaKey(videoElement) {
-        // Video is disabled.
+        if (isAndroid || !webglProcessor || !videoElement.videoWidth) return;
+
+        const cropPercent = 0;
+        const crop = {
+            x: 0,
+            y: cropPercent,
+            width: 1,
+            height: 1 - cropPercent
+        };
+
+        const keyingOptions = {
+            threshold: 60 / 255.0,
+            max_green: 180.0 / 255.0
+        };
+
+        webglProcessor.render(videoElement, crop, keyingOptions);
     }
 
     function renderLoop() {
@@ -342,7 +368,7 @@
         finalUi2.appendChild(wrongStationBtn);
 
 
-        playVideo('mp4/cat_2_scene_wrong_station_25Fps 2_1.mp4', false);
+        playVideo('https://nicka-cc.github.io/sbercat2/mp4/cat_2_scene_wrong_station_25Fps 2_1.mp4', false);
     }
 
     function init() {
@@ -366,7 +392,7 @@
 
         videos.forEach(v => {
             v.addEventListener('ended', function () {
-                const videoSource = v.currentSrc || v.src || "";
+                const videoSource = v.dataset.originalSrc || v.currentSrc || v.src || "";
                 skipVideoButton.style.display = 'none';
                 if (videoSource.includes('Scen_5_25fps')) {
                     if (activeVideo) {
@@ -388,7 +414,7 @@
                     document.getElementById("wrong-btn").style.display = "block";
                 }
                 if (!v.loop) {
-                    playVideo('mp4/waiting_coffe_25Fps.mp4', true);
+                    playVideo('https://nicka-cc.github.io/sbercat2/mp4/waiting_coffe_25Fps.mp4', true);
                 }
                 updateSkipButtonVisibility();
             });
@@ -426,7 +452,7 @@
         createStatistics(SCENE_UUID, STATION);
         const finalUI = document.getElementById("final-ui");
         finalUI.style.display = "block";
-        playVideo('mp4/Scen_5_25fps.mp4', false);
+        playVideo('https://nicka-cc.github.io/sbercat2/mp4/Scen_5_25fps.mp4', false);
         function getCoinDeclension(number) {
             number = Math.abs(number);
             if (number % 10 === 1 && number % 100 !== 11) return 'монета';
@@ -450,7 +476,7 @@
                 navigator.share({
                     title: "Приглашение от друга!",
                     text: "Твой друг приглашает тебя в офис Сбера на игру!",
-                    url: window.location.origin + '/friend_share_page.html'
+                    url: 'https://nicka-cc.github.io/sbercat2/friend_share_page.html'
                 });
             } catch (e) {
                 alert("Поделиться невозможно на этом устройстве.");
@@ -464,10 +490,20 @@
             window.location.href = "qr.html";
         };
     }
-    init();
-    if (!isAndroid) {
-        renderLoop();
-    }
+
+    const finalAssetsConfig = {
+        finalVideo: 'https://nicka-cc.github.io/sbercat2/mp4/Scen_5_25fps.mp4',
+        waitingVideo: 'https://nicka-cc.github.io/sbercat2/mp4/waiting_coffe_25Fps.mp4',
+        wrongStationVideo: 'https://nicka-cc.github.io/sbercat2/mp4/cat_2_scene_wrong_station_25Fps 2_1.mp4'
+    };
+
+    preloadAssets(finalAssetsConfig, () => {
+        init();
+        if (!isAndroid) {
+            renderLoop();
+        }
+    }, ['main-content', 'soundOverlay']);
+
 </script>
 <div id="camera-access-required"
      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: black; color: white; text-align: center; z-index: 99999999;">
