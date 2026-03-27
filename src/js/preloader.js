@@ -19,7 +19,7 @@ function preloadAssets(stationConfig, onComplete, elementsToUnhide, htmlPagesToP
             return newSrc;
         } else {
             // For non-android devices (iOS, desktop), use mp4 from folder /2/
-            return src.replace('https://nicka-cc.github.io/sbercat2/mp4/', 'https://nicka-cc.github.io/sbercat2/2/');
+            return src.replace('https://nicka-cc.github.io/sbercat2/mp4/', 'https://nicka-cc.github.io/sbercat2/1and5/');
         }
     }
 
